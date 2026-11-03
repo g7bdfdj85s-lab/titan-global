@@ -724,3 +724,73 @@ window.updateMission = ((original) => function(id, status) {
     }
   }
 })();
+// TITAN GLOBAL — FORCE DATABASE MISSION CREATION
+document.addEventListener("click", async function(event) {
+  const button = event.target.closest("#create-mission");
+  if (!button) return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+
+  const db = window.titanSupabase;
+  const user = window.titanUser;
+  const input = document.querySelector("#mission-input");
+  const text = input.value.trim();
+
+  if (!text) {
+    toast("Describe the mission first.");
+    return;
+  }
+
+  if (!db || !user) {
+    toast("Founder session not ready. Sign in again.");
+    return;
+  }
+
+  button.disabled = true;
+
+  try {
+    const { data: companies, error: companyError } = await db
+      .from("companies")
+      .select("id")
+      .eq("owner_id", user.id)
+      .limit(1);
+
+    if (companyError) throw companyError;
+    if (!companies.length) throw new Error("Company not found.");
+
+    const { data, error } = await db
+      .from("missions")
+      .insert({
+        company_id: companies[0].id,
+        title: text,
+        department: document.querySelector("#mission-dept").value,
+        priority: document.querySelector("#mission-priority").value,
+        status: "Queued",
+        created_by: user.id
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    missions.push({
+      id: data.id,
+      text: data.title,
+      dept: data.department,
+      priority: data.priority,
+      status: data.status,
+      date: new Date(data.created_at).toLocaleDateString()
+    });
+
+    store.set("missions", missions);
+    input.value = "";
+    render();
+    toast("Mission saved to Supabase.");
+  } catch (error) {
+    console.error(error);
+    toast("Database save failed: " + error.message);
+  } finally {
+    button.disabled = false;
+  }
+}, true);
