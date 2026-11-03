@@ -656,6 +656,7 @@ window.updateMission = ((original) => function(id, status) {
 
     store.set("missions", missions);
     render();
+   toast("SUPABASE MISSIONS LOADED: " + data.length);
   }
 
   db.auth.onAuthStateChange((event, session) => {
