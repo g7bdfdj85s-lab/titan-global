@@ -616,3 +616,111 @@ window.updateMission = ((original) => function(id, status) {
     }
   }
 })();
+// TITAN GLOBAL — SUPABASE MISSION SYNC
+(async function () {
+  const db = window.titanSupabase;
+  if (!db) return;
+
+  let companyId = null;
+
+  async function loadMissions(session) {
+    if (!session) return;
+
+    const { data: companies, error: companyError } = await db
+      .from("companies")
+      .select("id")
+      .eq("owner_id", session.user.id)
+      .limit(1);
+
+    if (companyError) throw companyError;
+    if (!companies.length) throw new Error("Company not found.");
+
+    companyId = companies[0].id;
+
+    const { data, error } = await db
+      .from("missions")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("created_at");
+
+    if (error) throw error;
+
+    missions = data.map(m => ({
+      id: m.id,
+      text: m.title,
+      dept: m.department,
+      priority: m.priority,
+      status: m.status,
+      date: new Date(m.created_at).toLocaleDateString()
+    }));
+
+    store.set("missions", missions);
+    render();
+  }
+
+  db.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      setTimeout(() => loadMissions(session).catch(console.error), 0);
+    }
+  });
+
+  document.querySelector("#create-mission").addEventListener("click", () => {
+    setTimeout(async () => {
+      const mission = missions[missions.length - 1];
+      if (!mission || !companyId || typeof mission.id !== "number") return;
+
+      try {
+        const { data, error } = await db
+          .from("missions")
+          .insert({
+            company_id: companyId,
+            title: mission.text,
+            department: mission.dept,
+            priority: mission.priority,
+            status: mission.status,
+            created_by: window.titanUser.id
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        mission.id = data.id;
+        store.set("missions", missions);
+        render();
+        toast("Mission saved to Supabase.");
+      } catch (error) {
+        console.error(error);
+        toast("Database save failed: " + error.message);
+      }
+    }, 100);
+  });
+
+  const previousUpdate = window.updateMission;
+
+  window.updateMission = function (id, status) {
+    previousUpdate(id, status);
+
+    if (typeof id !== "string" || !companyId) return;
+
+    db.from("missions")
+      .update({ status })
+      .eq("id", id)
+      .eq("company_id", companyId)
+      .then(({ error }) => {
+        if (error) toast("Status sync failed: " + error.message);
+        else toast("Mission status synced.");
+      });
+  };
+
+  const { data } = await db.auth.getSession();
+  if (data.session) {
+    try {
+      await loadMissions(data.session);
+      toast("Mission database connected.");
+    } catch (error) {
+      console.error(error);
+      toast("Mission sync error: " + error.message);
+    }
+  }
+})();
