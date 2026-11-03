@@ -59,3 +59,25 @@ function showPage(p){$$(".nav").forEach(b=>b.classList.toggle("active",b.dataset
 $$("[data-go]").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.go)));
 render();renderOpps();
 if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+const TITAN_API_BASE = "https://titan-global-api.onrender.com";
+
+async function checkTitanBackend() {
+  const label = document.querySelector(".side-bottom span");
+  const detail = document.querySelector(".side-bottom small");
+
+  if (label) label.textContent = "CHECKING BACKEND...";
+
+  try {
+    const response = await fetch(TITAN_API_BASE + "/health");
+    if (!response.ok) throw new Error("API error");
+
+    const data = await response.json();
+    if (label) label.textContent = "BACKEND " + data.status.toUpperCase();
+    if (detail) detail.textContent = "Render connected · AI not enabled";
+  } catch {
+    if (label) label.textContent = "BACKEND UNAVAILABLE";
+    if (detail) detail.textContent = "Check Render connection";
+  }
+}
+
+checkTitanBackend();
