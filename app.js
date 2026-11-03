@@ -15,7 +15,7 @@ $("#m-agents").textContent=String(agents.length).padStart(2,"0");
 $("#approval-count").textContent=approvals.filter(a=>a.status==="Pending").length;
 $("#m-approvals").textContent=String(approvals.filter(a=>a.status==="Pending").length).padStart(2,"0");
 $("#approval-list").innerHTML=approvals.length?approvals.map(a=>`<div class="approval"><div><strong>${escapeHTML(a.title)}</strong><small>${escapeHTML(a.detail)} · ${escapeHTML(a.type)}</small><small>STATUS: ${a.status.toUpperCase()}</small></div>${a.status==="Pending"?`<div><button class="secondary" onclick="decide(${a.id},'Approved')">APPROVE</button><button class="secondary" onclick="decide(${a.id},'Rejected')">REJECT</button></div>`:""}</div>`).join(""):'<div class="panel">No pending approvals.</div>';
-$("#mission-list").innerHTML=missions.length?missions.slice().reverse().map(m=>`<div class="mission"><div><strong>${escapeHTML(m.text)}</strong><small>${escapeHTML(m.dept)} · ${escapeHTML(m.priority)} priority · ${m.date}</small></div><select onchange="updateMission(${m.id},this.value)"><option ${m.status==="Queued"?"selected":""}>Queued</option><option ${m.status==="In review"?"selected":""}>In review</option><option ${m.status==="Complete"?"selected":""}>Complete</option></select></div>`).join(""):'<div class="panel">No missions yet. Create your first mission above.</div>';
+onchange="updateMission('${m.id}',this.value)"
 $("#lesson-list").innerHTML=lessons.length?lessons.slice().reverse().map(l=>`<div class="lesson"><div><strong>${escapeHTML(l.text)}</strong><small>${escapeHTML(l.result)} · ${l.date}</small></div><span class="pill">RECORDED</span></div>`).join(""):'<div class="panel">No learning records yet. Record outcomes to build a decision history.</div>';
 $("#lesson-count").textContent=`${lessons.length} RECORDS`;
 $("#activity-list").innerHTML=[...missions.slice(-2).map(m=>({time:m.date,msg:"Mission created: "+m.text})),...lessons.slice(-2).map(l=>({time:l.date,msg:"Learning record added: "+l.text}))].slice(-4).reverse().map(x=>`<div class="activity-row"><span>${x.time}</span><div>${escapeHTML(x.msg)}</div></div>`).join("")||'<div class="activity-row"><span>READY</span><div>Command centre initialized. Add a directive to begin.</div></div>';
@@ -696,21 +696,27 @@ window.updateMission = ((original) => function(id, status) {
     }, 100);
   });
 
-  const previousUpdate = window.updateMission;
+    window.updateMission = async function (id, status) {
+    try {
+      const { error } = await db
+        .from("missions")
+        .update({ status })
+        .eq("id", id)
+        .eq("company_id", companyId);
 
-  window.updateMission = function (id, status) {
-    previousUpdate(id, status);
+      if (error) throw error;
 
-    if (typeof id !== "string" || !companyId) return;
+      missions = missions.map(m =>
+        m.id === id ? { ...m, status } : m
+      );
 
-    db.from("missions")
-      .update({ status })
-      .eq("id", id)
-      .eq("company_id", companyId)
-      .then(({ error }) => {
-        if (error) toast("Status sync failed: " + error.message);
-        else toast("Mission status synced.");
-      });
+      store.set("missions", missions);
+      render();
+      toast("Mission status saved to Supabase.");
+    } catch (error) {
+      console.error(error);
+      toast("Status save failed: " + error.message);
+    }
   };
 
   const { data } = await db.auth.getSession();
