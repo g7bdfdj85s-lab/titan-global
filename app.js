@@ -81,3 +81,45 @@ async function checkTitanBackend() {
 }
 
 checkTitanBackend();
+// TITAN GLOBAL — VISIBLE BACKEND STATUS
+(() => {
+  const badge = document.createElement("div");
+
+  badge.textContent = "BACKEND: CHECKING...";
+  Object.assign(badge.style, {
+    position: "fixed",
+    bottom: "20px",
+    right: "15px",
+    zIndex: "99999",
+    padding: "12px 16px",
+    borderRadius: "10px",
+    background: "#17243a",
+    color: "#ffffff",
+    border: "1px solid #4b9fff",
+    fontSize: "12px",
+    fontWeight: "bold",
+    fontFamily: "monospace"
+  });
+
+  document.body.appendChild(badge);
+
+  fetch("https://titan-global-api.onrender.com/health", {
+    cache: "no-store"
+  })
+    .then(response => {
+      if (!response.ok) throw new Error("API error");
+      return response.json();
+    })
+    .then(data => {
+      if (data.status !== "healthy") throw new Error("Unhealthy");
+
+      badge.textContent = "BACKEND: CONNECTED | AI: OFF";
+      badge.style.borderColor = "#35d49a";
+      badge.style.color = "#35d49a";
+    })
+    .catch(() => {
+      badge.textContent = "BACKEND: OFFLINE";
+      badge.style.borderColor = "#ff6464";
+      badge.style.color = "#ff6464";
+    });
+})();
