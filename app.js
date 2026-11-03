@@ -457,3 +457,162 @@ window.updateMission = ((original) => function(id, status) {
     store.set("automation_flagged", remaining);
   }
 })(window.updateMission);
+// TITAN GLOBAL — FOUNDER LOGIN
+(async function () {
+  const client = window.supabase.createClient(
+    "https://uyphbnnfgultvslgmcjn.supabase.co",
+    "sb_publishable_cQHdVhypL-B7IbkK_mXcEw_XHzAlKd7"
+  );
+
+  window.titanSupabase = client;
+
+  const style = document.createElement("style");
+  style.textContent = `
+    #titan-login {
+      position:fixed; inset:0; z-index:999999;
+      background:#080d18; display:grid; place-items:center;
+      padding:24px; color:white;
+    }
+    #titan-login section {
+      width:100%; max-width:400px; padding:25px;
+      background:#101827; border:1px solid #315070;
+      border-radius:14px;
+    }
+    #titan-login h2 {color:#e9bd70}
+    #titan-login input {
+      box-sizing:border-box; width:100%; padding:14px;
+      margin:8px 0; background:#080d18; color:white;
+      border:1px solid #315070; border-radius:6px;
+    }
+    #titan-login button {
+      width:100%; padding:14px; margin-top:12px;
+      background:#286ca7; color:white; border:0;
+      border-radius:6px;
+    }
+    #titan-login p {color:#ff9999;font-size:12px}
+  `;
+  document.head.appendChild(style);
+
+  const panel = document.createElement("div");
+  panel.id = "titan-login";
+  panel.innerHTML = `
+    <section>
+      <h2>TITAN GLOBAL</h2>
+      <p style="color:#9baac0">FOUNDER SECURE ACCESS</p>
+      <form id="titan-form">
+        <input id="titan-email" type="email"
+          placeholder="Email address" required>
+        <input id="titan-password" type="password"
+          placeholder="Password (minimum 8 characters)"
+          minlength="8" required>
+        <input id="titan-name" type="text"
+          placeholder="Founder name (for new account)"
+          style="display:none">
+        <button id="titan-submit">SIGN IN</button>
+      </form>
+      <button id="titan-toggle">CREATE FOUNDER ACCOUNT</button>
+      <p id="titan-message"></p>
+    </section>
+  `;
+  document.body.appendChild(panel);
+
+  let signup = false;
+  const message = document.querySelector("#titan-message");
+  const toggle = document.querySelector("#titan-toggle");
+  const name = document.querySelector("#titan-name");
+  const submit = document.querySelector("#titan-submit");
+
+  toggle.onclick = () => {
+    signup = !signup;
+    name.style.display = signup ? "block" : "none";
+    name.required = signup;
+    submit.textContent = signup ? "CREATE ACCOUNT" : "SIGN IN";
+    toggle.textContent = signup ? "BACK TO SIGN IN" : "CREATE FOUNDER ACCOUNT";
+    message.textContent = "";
+  };
+
+  async function enterWorkspace(user) {
+    const { data, error } = await client
+      .from("companies")
+      .select("id")
+      .eq("owner_id", user.id)
+      .limit(1);
+
+    if (error) throw error;
+
+    if (!data.length) {
+      const { error: createError } = await client
+        .from("companies")
+        .insert({
+          name: "TITAN GLOBAL",
+          industry: "Holding company",
+          status: "planning"
+        });
+
+      if (createError) throw createError;
+    }
+
+    window.titanUser = user;
+    panel.remove();
+    toast("Founder authenticated.");
+  }
+
+  document.querySelector("#titan-form").onsubmit = async event => {
+    event.preventDefault();
+    submit.disabled = true;
+    message.textContent = "PLEASE WAIT...";
+
+    const email = document.querySelector("#titan-email").value.trim();
+    const password = document.querySelector("#titan-password").value;
+
+    try {
+      if (signup) {
+        const { data, error } = await client.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: name.value.trim()
+            }
+          }
+        });
+
+        if (error) throw error;
+
+        if (!data.session) {
+          message.textContent =
+            "Account created. Check your email to confirm, then sign in.";
+          return;
+        }
+
+        await enterWorkspace(data.user);
+      } else {
+        const { data, error } =
+          await client.auth.signInWithPassword({ email, password });
+
+        if (error) throw error;
+        await enterWorkspace(data.user);
+      }
+    } catch (error) {
+      message.textContent = error.message;
+    } finally {
+      submit.disabled = false;
+      submit.textContent = signup ? "CREATE ACCOUNT" : "SIGN IN";
+    }
+  };
+
+  const { data, error } = await client.auth.getSession();
+
+  if (error) {
+    message.textContent = error.message;
+    return;
+  }
+
+  if (data.session) {
+    try {
+      await enterWorkspace(data.session.user);
+    } catch (error) {
+      message.textContent = error.message;
+    }
+  }
+})();
