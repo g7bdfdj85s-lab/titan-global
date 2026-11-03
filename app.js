@@ -445,3 +445,15 @@ checkTitanBackend();
   renderAutomation();
   console.log("TITAN GLOBAL Automation Engine loaded.");
 })();
+
+// Remove completed missions from the active attention queue
+window.updateMission = ((original) => function(id, status) {
+  original(id, status);
+
+  if (status === "Complete") {
+    const remaining = store.get("automation_flagged", [])
+      .filter(missionId => missionId !== id);
+
+    store.set("automation_flagged", remaining);
+  }
+})(window.updateMission);
