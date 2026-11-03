@@ -174,3 +174,274 @@ checkTitanBackend();
     }
   });
 })();
+// TITAN GLOBAL — AUTOMATION ENGINE
+(() => {
+  const defaults = {
+    riskGate: true,
+    completionCapture: true,
+    executiveBrief: true,
+    queueMonitor: true
+  };
+
+  let rules = { ...defaults, ...store.get("automation_rules", {}) };
+  let events = store.get("automation_events", []);
+  let flagged = store.get("automation_flagged", []);
+
+  const save = () => {
+    store.set("automation_rules", rules);
+    store.set("automation_events", events.slice(-80));
+    store.set("automation_flagged", flagged);
+  };
+
+  const log = (message, type = "INFO") => {
+    events.push({
+      id: Date.now(),
+      message,
+      type,
+      time: new Date().toLocaleString()
+    });
+    events = events.slice(-80);
+    save();
+    renderAutomation();
+  };
+
+  // Create the Automation Engine navigation button
+  const sidebar = document.querySelector(".sidebar");
+  const nav = document.createElement("button");
+  nav.className = "nav";
+  nav.dataset.page = "automation";
+  nav.innerHTML = "⟳ <span>Automation Engine</span>";
+  sidebar.insertBefore(nav, document.querySelector(".side-bottom"));
+
+  // Create the Automation Engine page
+  const page = document.createElement("section");
+  page.className = "page";
+  page.id = "page-automation";
+
+  page.innerHTML = `
+    <div class="intro">
+      <div class="eyebrow gold">RULES / TRIGGERS / GOVERNED EXECUTION</div>
+      <h2>Automation <em>Engine</em></h2>
+      <p>Local workflows controlled by the Founder. No paid AI calls or external actions.</p>
+    </div>
+
+    <div class="metrics">
+      <div class="metric"><small>ACTIVE RULES</small><strong id="auto-active">04</strong><span>Enabled rules</span></div>
+      <div class="metric"><small>PENDING APPROVALS</small><strong id="auto-approvals">00</strong><span>Founder decisions</span></div>
+      <div class="metric"><small>QUEUED MISSIONS</small><strong id="auto-queued">00</strong><span>Awaiting work</span></div>
+      <div class="metric"><small>AUTOMATION EVENTS</small><strong id="auto-events">00</strong><span>Local activity</span></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h4>Automation controls</h4><span class="pill">FOUNDER CONTROL</span></div>
+      <p class="fine">Rules run while the app is open. They do not run in the background after it is closed.</p>
+      <div id="automation-rules"></div>
+      <button class="primary full" id="run-automation">RUN AUTOMATION CYCLE ↗</button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h4>Automation activity</h4><button class="text-btn" id="clear-automation-log">CLEAR LOG</button></div>
+      <div id="automation-log"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h4>Safety boundaries</h4><span class="pill">ALWAYS ON</span></div>
+      <div class="governance">
+        <div><b>Human approval</b><span>Payments, contracts, investments and acquisitions require Founder approval.</span></div>
+        <div><b>Local storage</b><span>Workflow data stays in this browser on this device.</span></div>
+        <div><b>No background execution</b><span>Automation runs while the app is open.</span></div>
+        <div><b>No external actions</b><span>No purchases, transfers or third-party changes.</span></div>
+      </div>
+    </div>
+  `;
+
+  document.querySelector(".main footer").before(page);
+
+  // Navigation
+  nav.addEventListener("click", () => {
+    showPage("automation");
+    document.querySelector("#page-title").textContent = "Automation Engine";
+    renderAutomation();
+  });
+
+  // Styling
+  const style = document.createElement("style");
+  style.textContent = `
+    #automation-rules { display:grid; gap:10px; margin:15px 0; }
+    .automation-rule {
+      display:flex; justify-content:space-between; align-items:center;
+      gap:12px; padding:14px; border:1px solid var(--line);
+      border-radius:8px; background:#0d1726;
+    }
+    .automation-rule strong,.automation-rule small { display:block; }
+    .automation-rule strong { font-size:12px; }
+    .automation-rule small { font-size:10px; color:var(--muted); margin-top:5px; line-height:1.5; }
+    .rule-toggle {
+      min-width:55px; border:1px solid #58677a; border-radius:20px;
+      padding:8px; background:#202b3b; color:white;
+    }
+    .rule-toggle.enabled { background:#123a31; border-color:#287c60; color:#54d6a3; }
+    .automation-event {
+      padding:12px 0; border-top:1px solid var(--line);
+      font-size:11px; line-height:1.5;
+    }
+    .automation-event small { display:block; color:var(--muted); margin-bottom:4px; }
+  `;
+  document.head.appendChild(style);
+
+  function renderAutomation() {
+    const count = id => document.getElementById(id);
+
+    count("auto-active").textContent =
+      Object.values(rules).filter(Boolean).length;
+
+    count("auto-approvals").textContent =
+      approvals.filter(a => a.status === "Pending").length;
+
+    count("auto-queued").textContent =
+      missions.filter(m => m.status === "Queued").length;
+
+    count("auto-events").textContent = events.length;
+
+    const items = [
+      ["riskGate", "Founder approval gate", "Flags missions involving payments, contracts, investments or acquisitions."],
+      ["completionCapture", "Completion learning capture", "Records completed missions in the Learning Engine."],
+      ["executiveBrief", "Executive briefing", "Summarises pending approvals and queued work."],
+      ["queueMonitor", "Mission queue monitor", "Flags high-priority missions awaiting attention."]
+    ];
+
+    count("automation-rules").innerHTML = items.map(([key, title, description]) => `
+      <div class="automation-rule">
+        <div><strong>${title}</strong><small>${description}</small></div>
+        <button class="rule-toggle ${rules[key] ? "enabled" : ""}" data-rule="${key}">
+          ${rules[key] ? "ON" : "OFF"}
+        </button>
+      </div>
+    `).join("");
+
+    count("automation-log").innerHTML = events.length
+      ? events.slice().reverse().map(e => `
+          <div class="automation-event">
+            <small>${escapeHTML(e.time)} · ${escapeHTML(e.type)}</small>
+            ${escapeHTML(e.message)}
+          </div>
+        `).join("")
+      : '<p class="fine">No events yet. Run an automation cycle.</p>';
+  }
+
+  function processMission(m) {
+    if (!m) return;
+
+    const risky = /\b(payment|transfer|purchase|invest|investment|contract|sign|incorporat|acquisition|acquire|loan|borrow|hire|fire)\b/i.test(m.text);
+
+    if (rules.riskGate && risky) {
+      const exists = approvals.some(a => a.sourceMissionId === m.id);
+
+      if (!exists) {
+        approvals.push({
+          id: Date.now(),
+          sourceMissionId: m.id,
+          title: "Automated safety review",
+          detail: "Founder review required before any external action: " + m.text,
+          type: "Automation safety gate",
+          status: "Pending"
+        });
+
+        store.set("approvals", approvals);
+        render();
+        log("Founder approval created for a sensitive mission.", "APPROVAL");
+      }
+    }
+
+    if (rules.queueMonitor && m.priority === "High" && m.status === "Queued" && !flagged.includes(m.id)) {
+      flagged.push(m.id);
+      save();
+      log("High-priority mission needs attention: " + m.text, "ATTENTION");
+    }
+  }
+
+  // Monitor newly created missions
+  document.querySelector("#create-mission").addEventListener("click", () => {
+    setTimeout(() => {
+      const latest = missions[missions.length - 1];
+      if (latest) processMission(latest);
+    }, 0);
+  });
+
+  // Monitor mission completion
+  const originalUpdate = window.updateMission;
+
+  if (typeof originalUpdate === "function") {
+    window.updateMission = function(id, status) {
+      const previous = missions.find(m => m.id === id);
+      originalUpdate(id, status);
+
+      if (status === "Complete" && previous && previous.status !== "Complete" && rules.completionCapture) {
+        if (!lessons.some(l => l.sourceMissionId === id)) {
+          const completed = missions.find(m => m.id === id);
+          lessons.push({
+            id: Date.now(),
+            sourceMissionId: id,
+            text: "Mission completed: " + completed.text,
+            result: "mixed",
+            date: new Date().toLocaleDateString()
+          });
+
+          store.set("lessons", lessons);
+          render();
+          log("Completed mission added to Learning Engine.", "LEARNING");
+        }
+      }
+
+      renderAutomation();
+    };
+  }
+
+  // Run a cycle
+  document.querySelector("#run-automation").addEventListener("click", () => {
+    missions.filter(m => m.status === "Queued").forEach(processMission);
+
+    const pending = approvals.filter(a => a.status === "Pending").length;
+    const queued = missions.filter(m => m.status === "Queued").length;
+
+    log("Cycle complete: " + pending + " pending approvals and " + queued + " queued missions. No external actions taken.", "CYCLE");
+  });
+
+  // Toggle rules
+  document.querySelector("#automation-rules").addEventListener("click", e => {
+    const button = e.target.closest("[data-rule]");
+    if (!button) return;
+
+    const key = button.dataset.rule;
+    rules[key] = !rules[key];
+    save();
+    renderAutomation();
+    log("Rule " + key + " changed to " + (rules[key] ? "ON" : "OFF"));
+  });
+
+  // Clear activity
+  document.querySelector("#clear-automation-log").addEventListener("click", () => {
+    events = [];
+    save();
+    renderAutomation();
+    log("Activity log cleared by Founder.");
+  });
+
+  // Daily briefing
+  const today = new Date().toLocaleDateString();
+
+  if (rules.executiveBrief && store.get("automation_last_brief", "") !== today) {
+    store.set("automation_last_brief", today);
+    log(
+      "Daily brief: " +
+      approvals.filter(a => a.status === "Pending").length +
+      " pending approvals; " +
+      missions.filter(m => m.status === "Queued").length +
+      " queued missions.",
+      "BRIEF"
+    );
+  }
+
+  renderAutomation();
+  console.log("TITAN GLOBAL Automation Engine loaded.");
+})();
