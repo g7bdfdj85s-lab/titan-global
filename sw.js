@@ -1,5 +1,5 @@
 
-const CACHE = "titan-global-v5";
+const CACHE = "titan-global-v6";
 
 const ASSETS = [
   "./",
