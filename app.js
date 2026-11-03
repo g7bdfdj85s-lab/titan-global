@@ -123,3 +123,54 @@ checkTitanBackend();
       badge.style.color = "#ff6464";
     });
 })();
+// TITAN GLOBAL — LIVE AI DIRECTIVE CONNECTION
+(() => {
+  const button = document.querySelector("#send-directive");
+  const input = document.querySelector("#directive");
+  if (!button || !input) return;
+
+  const newButton = button.cloneNode(true);
+  button.replaceWith(newButton);
+
+  const result = document.createElement("div");
+  result.style.cssText =
+    "margin-top:15px;padding:15px;background:#17243a;color:white;border:1px solid #4b9fff;border-radius:10px;white-space:pre-wrap;";
+
+  newButton.after(result);
+
+  newButton.addEventListener("click", async () => {
+    const directive = input.value.trim();
+    if (directive.length < 3) {
+      toast("Enter a directive first.");
+      return;
+    }
+
+    newButton.disabled = true;
+    newButton.textContent = "AI ANALYSING...";
+    result.textContent = "Connecting to TITAN AI...";
+
+    try {
+      const response = await fetch(
+        "https://titan-global-api.onrender.com/directive",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ directive })
+        }
+      );
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "AI request failed.");
+
+      result.textContent = data.response;
+      input.value = "";
+      toast("TITAN AI response received.");
+    } catch (error) {
+      result.textContent = "ERROR: " + error.message;
+      toast("AI connection failed.");
+    } finally {
+      newButton.disabled = false;
+      newButton.textContent = "SUBMIT DIRECTIVE ↗";
+    }
+  });
+})();
